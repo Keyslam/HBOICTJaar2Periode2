@@ -30,6 +30,7 @@ public:
 
 	T Length2() const;
 	T Length() const;
+	T Distance2(const Vector2& other) const;
 
 	static Vector2<T> Zero();
 	static Vector2<T> One();

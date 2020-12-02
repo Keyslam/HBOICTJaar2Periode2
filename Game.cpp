@@ -16,13 +16,14 @@
 #include <queue>
 #include <functional>
 #include <chrono>
+#include <limits>
 
 Game::Game()
 {
 	renderer = new Renderer();
 	
-	tshBlue = new TankSpatialHash(1280, 720);
-	tshRed = new TankSpatialHash(1280, 720);
+	tshBlue = new TankSpatialHash(VIRTUAL_GAME_WIDTH, VIRTUAL_GAME_HEIGHT);
+	tshRed = new TankSpatialHash(VIRTUAL_GAME_WIDTH, VIRTUAL_GAME_HEIGHT);
 }
 
 Game::~Game()
@@ -92,6 +93,31 @@ void Game::Tick()
 	TickShooting();
 	TickMoveRockets(0, rocketBlueCount);
 
+
+	// Remove dead rockets
+	for (int i = rocketBlueCount - 1; i >= 0; i--) {
+		Rocket rocket = rocketsBlue[i];
+
+		if (!rocket.alive) {
+			if (i != rocketBlueCount - 1)
+				rocketsBlue[i] = rocketsBlue[rocketBlueCount - 1];
+				
+			rocketBlueCount--;
+		}
+	}
+
+	// Remove dead rockets
+	for (int i = rocketRedCount - 1; i >= 0; i--) {
+		Rocket rocket = rocketsRed[i];
+
+		if (!rocket.alive) {
+			if (i != rocketRedCount - 1)
+				rocketsRed[i] = rocketsRed[rocketRedCount - 1];
+
+			rocketRedCount--;
+		}
+	}
+
 	static std::chrono::steady_clock::time_point lastTimeSinceRender = std::chrono::steady_clock::now();
 
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
@@ -139,8 +165,9 @@ void Game::TickRedTanks(int start, int count) {
 		normalizedDirection.Normalize();
 
 		Vector2<float> velocity = normalizedDirection + tank.force;
+		velocity *= Tank::maxSpeed;
 
-		tank.position += velocity * Tank::maxSpeed;
+		tank.position += velocity;
 
 		tshRed->UpdateTank(tank);
 	}
@@ -149,30 +176,42 @@ void Game::TickRedTanks(int start, int count) {
 void Game::TickShooting() {
 	framesUntilShoot--;
 
-	if (framesUntilShoot <= 0 && rocketBlueCount < 3000) {
+	if (framesUntilShoot <= 0) {
 		for (int i = 0; i < 1279; i++) {
-			Tank* tank = &tanksBlue[i];
+			Tank tank = tanksBlue[i];
 
 			Rocket& rocket = rocketsBlue[rocketBlueCount + i];
-			rocket.position.Set(tank->position.x, tank->position.y);
-			rocket.velocity.Set(3.0f, 0.0f);
+			rocket.position.Set(tank.position.x, tank.position.y);
+
+			Tank& target = FindClosestRedTank(tank.position);
+
+			Vector2<float> targetPosition = (target.position - tank.position).Normalized();
+			targetPosition *= 3.0f;
+
+			rocket.velocity.Set(targetPosition.x, targetPosition.y);
 		}
 		rocketBlueCount += 1279;
 
-		framesUntilShoot = framesUntilShootCooldown;
+		framesUntilShoot = TANK_SHOOT_COOLDOWN;
 	}
 
-	if (framesUntilShoot <= 0 && rocketRedCount < 3000) {
+	if (framesUntilShoot <= 0) {
 		for (int i = 0; i < 1279; i++) {
-			Tank* tank = &tanksRed[i];
+			Tank tank = tanksRed[i];
 
 			Rocket& rocket = rocketsRed[rocketRedCount + i];
-			rocket.position.Set(tank->position.x, tank->position.y);
-			rocket.velocity.Set(-3.0f, 0.0f);
+			rocket.position.Set(tank.position.x, tank.position.y);
+			
+			Tank& target = FindClosestBlueTank(tank.position);
+
+			Vector2<float> targetPosition = (target.position - tank.position).Normalized();
+			targetPosition *= 3.0f;
+
+			rocket.velocity.Set(targetPosition.x, targetPosition.y);
 		}
 		rocketRedCount += 1279;
 
-		framesUntilShoot = framesUntilShootCooldown;
+		framesUntilShoot = TANK_SHOOT_COOLDOWN;
 	}
 }
 
@@ -182,11 +221,25 @@ void Game::TickMoveRockets(int start, int count) {
 	for (int i = start; i < start + count; i++) {
 		Rocket& rocket = rocketsBlue[i];
 		rocket.position += rocket.velocity;
+
+		tshRed->EachOverlappingCell(rocket.position.x - Rocket::collisionRadius, rocket.position.y - Rocket::collisionRadius, Rocket::collisionRadius * 2, Rocket::collisionRadius * 2, [&](TankSpatialCell* cell) {
+			for (int i = 0; i < cell->size(); i++) {
+				Tank* tank = (*cell)[i];
+
+
+			}
+		});
+
+		// Check > width first, because that is more likely
+		rocket.alive = !((rocket.position.x > VIRTUAL_GAME_WIDTH) || (rocket.position.x < 0) || (rocket.position.y < 0) || (rocket.position.y > VIRTUAL_GAME_HEIGHT));
 	}
 
 	for (int i = start; i < start + count; i++) {
 		Rocket& rocket = rocketsRed[i];
 		rocket.position += rocket.velocity;
+
+		// Check < 0 first, because that is more likely
+		rocket.alive = !((rocket.position.x < 0) || (rocket.position.x > VIRTUAL_GAME_WIDTH) || (rocket.position.y < 0) || (rocket.position.y > VIRTUAL_GAME_HEIGHT));
 	}
 }
 
@@ -224,4 +277,40 @@ void Game::RenderRedRockets(int start, int count) {
 		Rocket& rocket = rocketsRed[i];
 		renderer->DrawRedRocket(rocket.position.x, rocket.position.y);
 	}
+}
+
+Tank& Game::FindClosestRedTank(Vector2<float> position) {
+	Tank closest;
+	float closestDistanceSquared = std::numeric_limits<float>::max();
+
+	for (int i = 0; i < 1279; i++) {
+		Tank tank = tanksRed[i];
+
+		float distanceSquared = tank.position.Length2();
+
+		if (distanceSquared < closestDistanceSquared) {
+			closest = tank;
+			closestDistanceSquared = distanceSquared;
+		}
+	}
+
+	return closest;
+}
+
+Tank& Game::FindClosestBlueTank(Vector2<float> position) {
+	Tank closest;
+	float closestDistanceSquared = std::numeric_limits<float>::max();
+
+	for (int i = 0; i < 1279; i++) {
+		Tank tank = tanksBlue[i];
+
+		float distanceSquared = tank.position.Length2();
+
+		if (distanceSquared < closestDistanceSquared) {
+			closest = tank;
+			closestDistanceSquared = distanceSquared;
+		}
+	}
+
+	return closest;
 }

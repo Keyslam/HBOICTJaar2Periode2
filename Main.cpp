@@ -11,8 +11,8 @@
 
 int main(int argc, char* argv[]) {
 	// SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
-	// SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
-	SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
+	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+	// SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
 
 	PROFILE_START("Session");
 
@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
 
 	auto difference = end - start;
 	std::cout << difference.count() << " us" << std::endl;
-	// std::cin.get();
+	std::cin.get();
 
 	PROFILE_END();
 

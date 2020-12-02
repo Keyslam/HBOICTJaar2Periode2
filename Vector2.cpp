@@ -142,6 +142,12 @@ T Vector2<T>::Length2() const
 }
 
 template <typename T>
+T Vector2<T>::Distance2(const Vector2& other) const
+{
+	
+}
+
+template <typename T>
 Vector2<T> Vector2<T>::Zero()
 {
 	return Vector2(0, 0);

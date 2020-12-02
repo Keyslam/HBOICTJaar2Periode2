@@ -34,13 +34,13 @@ void TankSpatialHash::AddTank(Tank& tank)
 	hashCache.topLeftIndex = topLeftIndex;
 	hashCache.bottomRightIndex = bottomRightIndex;
 
-	EachOverlappingCell(tank.position.x - Tank::collisionRadius, tank.position.y - Tank::collisionRadius, Tank::collisionRadius, Tank::collisionRadius, [&](TankSpatialCell* cell) {
+	EachOverlappingCell(tank.position.x - Tank::collisionRadius, tank.position.y - Tank::collisionRadius, Tank::collisionRadius * 2, Tank::collisionRadius * 2, [&](TankSpatialCell* cell) {
 		cell->push_back(&tank);
 	});
 }
 
 void TankSpatialHash::RemoveTank(Tank& tank) {
-	EachOverlappingCell(tank.position.x - Tank::collisionRadius, tank.position.y - Tank::collisionRadius, Tank::collisionRadius, Tank::collisionRadius, [&](TankSpatialCell* cell) {
+	EachOverlappingCell(tank.position.x - Tank::collisionRadius, tank.position.y - Tank::collisionRadius, Tank::collisionRadius * 2, Tank::collisionRadius * 2, [&](TankSpatialCell* cell) {
 		int index = -1;
 		for (int i = 0; i < cell->size(); i++) {
 			if (&tank == (*cell)[i]) {

@@ -11,5 +11,6 @@ public:
 
 	Vector2<float> position;
 	Vector2<float> velocity;
+	bool alive = true;
 };
 
